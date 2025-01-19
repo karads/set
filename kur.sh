@@ -28,3 +28,4 @@ mdkir /root/check10/
 unzip /root/accounts.zip
 screen -dmS bas bash start.sh
 bash 10ups.sh
+for i in {1..10}; do screen -dmS up$i bash /root/set/yeniup$i.sh; done

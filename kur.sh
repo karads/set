@@ -27,3 +27,4 @@ mdkir /root/check9/
 mdkir /root/check10/
 unzip /root/accounts.zip
 screen -dmS bas bash start.sh
+bash 10ups.sh

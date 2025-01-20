@@ -14,7 +14,7 @@ TEMPLATE_SCRIPT=$(cat <<'EOF'
 #!/bin/bash
 
 WATCH_DIR="{{WATCH_DIR}}"
-FINAL_REMOTE="{{FINAL_REMOTE}}"
+FINAL_REMOTE="crypt:"
 MOUNT_POINT="{{MOUNT_POINT}}"
 MAX_USAGE=5
 SLEEP_BETWEEN=60
@@ -153,7 +153,6 @@ EOF
 
 # Generate scripts
 for i in $(seq 1 $NUM_SCRIPTS); do
-    CHUNK_NAME="chunk$i"
     WATCH_DIR="${BASE_WATCH_DIR}${i}"
     MOUNT_POINT="${BASE_MOUNT_POINT}${i}"
     LOG_FILE="${BASE_LOG}${i}.log"
@@ -162,7 +161,6 @@ for i in $(seq 1 $NUM_SCRIPTS); do
     # Replace placeholders and create the script
     echo "$TEMPLATE_SCRIPT" | sed \
         -e "s|{{WATCH_DIR}}|$WATCH_DIR|" \
-        -e "s|{{FINAL_REMOTE}}|$CHUNK_NAME:|" \
         -e "s|{{MOUNT_POINT}}|$MOUNT_POINT|" \
         -e "s|{{LOG_TMP}}|$LOG_FILE|" \
         > "$SCRIPT_NAME"

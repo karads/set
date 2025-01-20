@@ -26,6 +26,7 @@ mdkir /root/check8/
 mdkir /root/check9/
 mdkir /root/check10/
 unzip /root/accounts.zip
+chmod 777 client
 screen -dmS bas bash start.sh
 screen -dmS move bash move.sh
 bash 10ups.sh

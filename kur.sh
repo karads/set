@@ -15,16 +15,7 @@ mkdir /root/.config/
 mkdir /root/.config/rclone/
 mv rclone.conf /root/.config/rclone/
 mv accounts.zip /root/
-mdkir /root/check1/
-mdkir /root/check2/
-mdkir /root/check3/
-mdkir /root/check4/
-mdkir /root/check5/
-mdkir /root/check6/
-mdkir /root/check7/
-mdkir /root/check8/
-mdkir /root/check9/
-mdkir /root/check10/
+for i in {1..10}; do mkdir -p /root/check$i; done
 unzip /root/accounts.zip
 chmod 777 client
 screen -dmS bas bash start.sh

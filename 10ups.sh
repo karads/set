@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 #
-# This script will generate 10 separate scripts (script1.sh ... script10.sh).
+# This script will generate 10 separate scripts (yeniup1.sh ... yeniup10.sh).
 # Each generated script will have:
-#   - WATCH_DIR="/mnt/upX"    (X from 1 to 10)
-#   - MOUNT_POINT="/root/checkX"    (X from 1 to 10)
-#   - And the rclone move step uses "chunkX:" instead of "chunk1:".
+#   - WATCH_DIR="/mnt/upX"         (X from 1 to 10)
+#   - MOUNT_POINT="/root/checkX"   (X from 1 to 10) -- though we don't mount anymore,
+#     we'll keep the variable for consistency.
+#   - And the "rclone move" step uses "chunkX:" instead of "chunk1:".
 #
-# After generation, each script is standalone and can be run independently.
-# Just remember to `chmod +x scriptX.sh` to make them executable.
-
-# We'll store all the template code in a variable and substitute the parts
-# that change for each script.
+# Instead of mounting each SA to check "df -h" usage, we now run "rclone about"
+# to see how much space is used in that SA's My Drive. If the used% is > MAX_USAGE,
+# we skip that SA. This avoids confusion with local server disk usage.
+#
+# After generation, run "chmod +x yeniup*.sh" and execute each as needed.
 
 for i in $(seq 1 10); do
 
@@ -19,8 +20,8 @@ for i in $(seq 1 10); do
 
 WATCH_DIR="/mnt/up${i}"
 FINAL_REMOTE="crypt:"
-MOUNT_POINT="/root/check${i}"
-MAX_USAGE=5
+MOUNT_POINT="/root/check${i}"   # Not actually used for mounting now, but kept for naming consistency
+MAX_USAGE=5                     # If used% > 5, we skip that SA
 SLEEP_BETWEEN=60
 
 ACCOUNTS_PARENT="/root/set/accounts"
@@ -61,26 +62,61 @@ get_group_sa_files() {
     echo "\${result[@]}"
 }
 
+###############################################################################
+# NEW SA USAGE CHECK (via rclone about)
+# Compares (Used / Total) * 100 to MAX_USAGE.
+# If usage% > MAX_USAGE, we treat it as "full" (return usage=100).
+###############################################################################
 check_sa_usage() {
     local sa_file="\$1"
-    mkdir -p "\$MOUNT_POINT"
-    rclone mount \\
-        "\$FINAL_REMOTE" \\
-        "\$MOUNT_POINT" \\
-        --daemon \\
-        --drive-service-account-file "\$sa_file"
-    sleep 3
 
-    local used
-    used=\$(df -h "\$MOUNT_POINT" | tail -1 | awk '{print \$5}' | sed 's/%//')
-    fusermount -u "\$MOUNT_POINT" 2>/dev/null
-    sleep 1
+    # Run 'rclone about' on the FINAL_REMOTE (crypt:), but using the SA credentials.
+    # Save output into a variable
+    local about_out
+    about_out=\$(rclone about "\$FINAL_REMOTE" --drive-service-account-file "\$sa_file" 2>&1)
+    local rc=\$?
 
-    [[ -z "\$used" ]] && used=100
-    echo "\$used"
+    # If the command failed, we treat usage as 100
+    if [[ \$rc -ne 0 ]]; then
+        echo 100
+        return
+    fi
+
+    # Parse lines like "Used: X GiB" / "Total: Y GiB".
+    # e.g. about_out might contain:
+    #   Used: 1.286 GiB
+    #   Free: 13.714 GiB
+    #   Total: 15 GiB
+    local used_gib total_gib
+    used_gib=\$(echo "\$about_out" | grep '^Used:'   | awk '{print \$2}')
+    total_gib=\$(echo "\$about_out" | grep '^Total:' | awk '{print \$2}')
+
+    # If we couldn't parse them, treat usage as 100
+    if [[ -z "\$used_gib" || -z "\$total_gib" ]]; then
+        echo 100
+        return
+    fi
+
+    # Remove any trailing 'GiB' (if present)
+    used_gib=\$(echo "\$used_gib" | sed 's/GiB//I')
+    total_gib=\$(echo "\$total_gib" | sed 's/GiB//I')
+
+    # Compute usage = (used_gib / total_gib) * 100
+    local usage
+    usage=\$(awk -v u="\$used_gib" -v t="\$total_gib" 'BEGIN {
+        if (t <= 0) { print 100 }
+        else { print (u / t * 100) }
+    }')
+
+    # Round down or just keep it as is
+    usage=\$(printf "%.0f" "\$usage")
+
+    echo "\$usage"
 }
 
+###############################################################################
 # Tek dosya (kaynak), SA => rclone move
+###############################################################################
 upload_with_retry() {
     local src="\$1"
     local sa_file="\$2"
@@ -134,7 +170,6 @@ upload_with_retry() {
     done
 }
 
-
 ########################
 # ANA DÖNGÜ
 ########################
@@ -161,7 +196,6 @@ while true; do
         continue
     fi
 
-    # Orijinal .fpt silinir, .rclone_chunk.* + pointer .fpt chunker nereye isterse
     # 3) chunk dosyalarını isme göre bul
     chunk_files=( \$(find / -type f -name "\${base_name}.rclone_chunk.*" 2>/dev/null | sort) )
     if [[ \${#chunk_files[@]} -eq 0 ]]; then
@@ -204,7 +238,7 @@ while true; do
             fi
         done
         if \$all_empty; then
-            echo "[OK] Bu 6 SA boş => kullanıyoruz"
+            echo "[OK] Bu 6 SA boş (<=\$MAX_USAGE% used) => kullanıyoruz"
             six_sas=( "\${SA_LIST[@]}" )
             break
         fi
@@ -253,7 +287,8 @@ done
 
 EOF
 
-  # Make the script executable
   chmod +x "yeniup${i}.sh"
   echo "Created yeniup${i}.sh"
 done
+
+echo "All yeniup scripts generated with the updated check_sa_usage() method."

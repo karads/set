@@ -29,4 +29,5 @@ unzip /root/accounts.zip
 screen -dmS bas bash start.sh
 screen -dmS move bash move.sh
 bash 10ups.sh
+chmod +x /root/set/yeniup*.sh
 for i in {1..10}; do screen -dmS up$i bash /root/set/yeniup$i.sh; done

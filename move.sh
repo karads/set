@@ -1,4 +1,3 @@
-cat << 'EOF' > ~/move.sh
 #!/bin/bash
 
 # Directories to move files to
@@ -28,4 +27,3 @@ while true; do
     ((index=(index+1)%${#destinations[@]}))
   fi
 done
-EOF
